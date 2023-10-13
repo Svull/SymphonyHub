@@ -1,0 +1,49 @@
+name: dotnet build & test
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  build_and_test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        # allows for building & testing multiple versions at once
+        dotnet-version: [ '7.0.x' ]
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup dotnet
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: ${{ matrix.dotnet-version }}
+
+      # Used for debugging purposes
+      - name: Display current dotnet version
+        run: dotnet --version
+
+      - name: Restore nuget depedencies
+        run: dotnet restore
+
+      - name: Build dotnet
+        run: dotnet build --no-restore
+
+      - name: Run dotnet test
+        run: dotnet test --no-build --verbosity normal --logger trx --results-directory "TestResults-${{ matrix.dotnet-version }}"
+
+      - name: Upload dotnet test results
+        uses: actions/upload-artifact@v3
+        with:
+          name: dotnet-test-results-${{ matrix.dotnet-version }}
+          path: TestResults-${{ matrix.dotnet-version }}
+        # This forces upload even if test run failed
+        if: ${{ always() }}
+
+      # Validates you can't check-in code which hasn't been properly formated
+      - name: Run dotnet format
+        run: dotnet format --no-restore --verify-no-changes --verbosity diagnostic
